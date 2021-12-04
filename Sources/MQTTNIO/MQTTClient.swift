@@ -125,7 +125,7 @@ public final class MQTTClient {
                 self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
             #endif
             case .ts, .none:
-                self.eventLoopGroup = NIOTSEventLoopGroup()
+                self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1) //NIOTSEventLoopGroup()
             }
             #else
             self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
