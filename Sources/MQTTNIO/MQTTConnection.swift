@@ -130,9 +130,12 @@ final class MQTTConnection {
             }
             return bootstrap
         }
-        #else
-        return NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
         #endif
+
+      if let clientBootstrap = ClientBootstrap(validatingGroup: client.eventLoopGroup) {
+        return NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
+      }
+
         preconditionFailure("Cannot create bootstrap for the supplied EventLoop")
     }
 
