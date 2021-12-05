@@ -111,8 +111,7 @@ final class MQTTConnection {
             }
             return bootstrap
         }
-        #endif
-        #if canImport(NIOSSL) // canImport(Network)
+        #elseif canImport(NIOSSL) // canImport(Network)
         if let clientBootstrap = ClientBootstrap(validatingGroup: client.eventLoopGroup) {
             let tlsConfiguration: TLSConfiguration
             switch client.configuration.tlsConfiguration {
@@ -131,6 +130,8 @@ final class MQTTConnection {
             }
             return bootstrap
         }
+        #else
+        return NIOClientTCPBootstrap(clientBootstrap, tls: NIOInsecureNoTLS())
         #endif
         preconditionFailure("Cannot create bootstrap for the supplied EventLoop")
     }
