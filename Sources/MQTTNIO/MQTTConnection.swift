@@ -23,8 +23,8 @@ import NIOSSL
 import NIOTransportServices
 import NIOWebSocket
 
-final class MQTTConnection {
-    let channel: Channel
+public final class MQTTConnection {
+    public let channel: Channel
     let timeout: TimeAmount?
     let taskHandler: MQTTTaskHandler
 

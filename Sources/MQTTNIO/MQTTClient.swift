@@ -53,7 +53,7 @@ public final class MQTTClient {
     public let configuration: Configuration
 
     /// Connection client is using
-    var connection: MQTTConnection? {
+    public var connection: MQTTConnection? {
         get {
             self.lock.withLock {
                 _connection
