@@ -20,13 +20,13 @@ import NIOCore
 extension MQTTClient {
     public func shutdown(queue: DispatchQueue = .global()) async throws {
         return try await withUnsafeThrowingContinuation { cont in
-            shutdown(queue: queue) { error in
+          Task { await shutdown(queue: queue) { error in
                 if let error = error {
                     cont.resume(throwing: error)
                 } else {
                     cont.resume()
                 }
-            }
+          }}
         }
     }
 
@@ -136,18 +136,22 @@ public class MQTTPublishListener: AsyncSequence {
         self.client = client
         self.name = name
         self.stream = AsyncStream { cont in
-            client.addPublishListener(named: name) { result in
+          Task {
+            await client.addPublishListener(named: name) { result in
                 cont.yield(result)
             }
-            client.addShutdownListener(named: name) { _ in
+            await client.addShutdownListener(named: name) { _ in
                 cont.finish()
             }
+          }
         }
+
     }
 
-    deinit {
-        self.client.removePublishListener(named: self.name)
-        self.client.removeShutdownListener(named: self.name)
+  deinit {Task {
+       await self.client.removePublishListener(named: self.name)
+        await self.client.removeShutdownListener(named: self.name)
+  }
     }
 
     public __consuming func makeAsyncIterator() -> AsyncStream<Element>.AsyncIterator {

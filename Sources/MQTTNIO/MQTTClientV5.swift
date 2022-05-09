@@ -166,8 +166,8 @@ extension MQTTClient {
         ///   - name: Name of listener
         ///   - subscriptionIdentifier: subscription identifier to look for
         ///   - listener: listener function
-        public func addPublishListener(named name: String, subscriptionId: UInt, _ listener: @escaping (MQTTPublishInfo) -> Void) {
-            self.client.publishListeners.addListener(named: name) { result in
+        public func addPublishListener(named name: String, subscriptionId: UInt, _ listener: @escaping (MQTTPublishInfo) -> Void) async {
+            await self.client.publishListeners.addListener(named: name) { result in
                 if case .success(let info) = result {
                     for property in info.properties {
                         if case .subscriptionIdentifier(let id) = property,

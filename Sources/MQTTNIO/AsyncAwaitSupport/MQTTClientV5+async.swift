@@ -128,18 +128,20 @@ public class MQTTPublishIdListener: AsyncSequence {
         self.client = client.client
         self.name = name
         self.stream = AsyncStream { cont in
-            client.addPublishListener(named: name, subscriptionId: subscriptionId) { result in
+          Task {
+            await client.addPublishListener(named: name, subscriptionId: subscriptionId) { result in
                 cont.yield(result)
             }
-            client.client.addShutdownListener(named: name) { _ in
+            await client.client.addShutdownListener(named: name) { _ in
                 cont.finish()
-            }
+            }}
         }
     }
 
-    deinit {
-        self.client.removePublishListener(named: self.name)
-        self.client.removeShutdownListener(named: self.name)
+  deinit {Task {
+   await     self.client.removePublishListener(named: self.name)
+    await    self.client.removeShutdownListener(named: self.name)
+  }
     }
 
     public __consuming func makeAsyncIterator() -> AsyncStream<Element>.AsyncIterator {

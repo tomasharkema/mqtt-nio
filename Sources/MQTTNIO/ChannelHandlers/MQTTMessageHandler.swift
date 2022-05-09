@@ -59,7 +59,7 @@ class MQTTMessageHandler: ChannelDuplexHandler {
         let buffer = self.unwrapInboundIn(data)
 
         do {
-            try self.decoder.process(buffer: buffer) { message in
+          try self.decoder.process(buffer: buffer) { message in Task {
                 switch message.type {
                 case .PUBLISH:
                     let publishMessage = message as! MQTTPublishPacket
@@ -69,7 +69,7 @@ class MQTTMessageHandler: ChannelDuplexHandler {
                         "mqtt_packet_id": .stringConvertible(publishMessage.packetId),
                         "mqtt_topicName": .string(publishMessage.publish.topicName),
                     ])
-                    self.respondToPublish(publishMessage)
+                    await self.respondToPublish(publishMessage)
                     return
 
                 case .CONNACK, .PUBACK, .PUBREC, .PUBCOMP, .SUBACK, .UNSUBACK, .PINGRESP, .AUTH:
@@ -92,6 +92,7 @@ class MQTTMessageHandler: ChannelDuplexHandler {
                     return
                 }
                 self.client.logger.trace("MQTT In", metadata: ["mqtt_message": .stringConvertible(message), "mqtt_packet_id": .stringConvertible(message.packetId)])
+          }
             }
         } catch {
             context.fireErrorCaught(error)
@@ -108,16 +109,16 @@ class MQTTMessageHandler: ChannelDuplexHandler {
     /// If QoS is `.atMostOnce` then no response is required
     /// If QoS is `.atLeastOnce` then send PUBACK
     /// If QoS is `.exactlyOnce` then send PUBREC, wait for PUBREL and then respond with PUBCOMP (in `respondToPubrel`)
-    private func respondToPublish(_ message: MQTTPublishPacket) {
+    private func respondToPublish(_ message: MQTTPublishPacket) async {
         guard let connection = client.connection else { return }
         switch message.publish.qos {
         case .atMostOnce:
-            self.client.publishListeners.notify(.success(message.publish))
+            await self.client.publishListeners.notify(.success(message.publish))
 
         case .atLeastOnce:
             connection.sendMessageNoWait(MQTTPubAckPacket(type: .PUBACK, packetId: message.packetId))
                 .map { _ in return message.publish }
-                .whenComplete { self.client.publishListeners.notify($0) }
+                .whenComplete { d in Task { await self.client.publishListeners.notify(d)  } }
 
         case .exactlyOnce:
             var publish = message.publish
@@ -139,7 +140,9 @@ class MQTTMessageHandler: ChannelDuplexHandler {
                 if case .failure(let error) = result, case MQTTError.retrySend = error {
                     return
                 }
-                self.client.publishListeners.notify(result)
+              Task {
+                await self.client.publishListeners.notify(result)
+              }
             }
         }
     }

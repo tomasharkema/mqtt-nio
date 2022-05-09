@@ -147,7 +147,7 @@ public final class MQTTClient {
     /// EventLoopGroup if the client created it
     ///
     /// - Throws: MQTTError.alreadyShutdown: You have already shutdown the client
-    public func syncShutdownGracefully() throws {
+    public func syncShutdownGracefully() async throws {
         if let eventLoop = MultiThreadedEventLoopGroup.currentEventLoop {
             preconditionFailure("""
             BUG DETECTED: syncShutdown() must not be called when on an EventLoop.
@@ -158,7 +158,7 @@ public final class MQTTClient {
         let errorStorageLock = Lock()
         var errorStorage: Error?
         let continuation = DispatchWorkItem {}
-        self.shutdown(queue: DispatchQueue(label: "mqtt-client.shutdown")) { error in
+        await self.shutdown(queue: DispatchQueue(label: "mqtt-client.shutdown")) { error in
             if let error = error {
                 errorStorageLock.withLock {
                     errorStorage = error
@@ -181,14 +181,14 @@ public final class MQTTClient {
     /// - Parameters:
     ///   - queue: Dispatch Queue to run shutdown on
     ///   - callback: Callback called when shutdown is complete. If there was an error it will return with Error in callback
-    public func shutdown(queue: DispatchQueue = .global(), _ callback: @escaping (Error?) -> Void) {
+    public func shutdown(queue: DispatchQueue = .global(), _ callback: @escaping (Error?) -> Void) async {
         guard self.isShutdown.compareAndExchange(expected: false, desired: true) else {
             callback(MQTTError.alreadyShutdown)
             return
         }
         let eventLoop = self.eventLoopGroup.next()
         let closeFuture: EventLoopFuture<Void>
-        self.shutdownListeners.notify(.success(()))
+        await self.shutdownListeners.notify(.success(()))
         if let connection = self.connection {
             closeFuture = connection.close()
         } else {
@@ -206,7 +206,9 @@ public final class MQTTClient {
             case .success:
                 closeError = nil
             }
-            self.shutdownListeners.notify(.success(()))
+          Task {
+            await self.shutdownListeners.notify(.success(()))
+          }
             self.shutdownEventLoopGroup(queue: queue) { error in
                 callback(closeError ?? error)
             }
@@ -343,33 +345,33 @@ public final class MQTTClient {
     }
 
     /// Add named publish listener. Called whenever a PUBLISH message is received from the server
-    public func addPublishListener(named name: String, _ listener: @escaping (Result<MQTTPublishInfo, Swift.Error>) -> Void) {
-        self.publishListeners.addListener(named: name, listener: listener)
+    public func addPublishListener(named name: String, _ listener: @escaping (Result<MQTTPublishInfo, Swift.Error>) -> Void) async {
+        await self.publishListeners.addListener(named: name, listener: listener)
     }
 
     /// Remove named publish listener
-    public func removePublishListener(named name: String) {
-        self.publishListeners.removeListener(named: name)
+  public func removePublishListener(named name: String) async {
+    await self.publishListeners.removeListener(named: name)
     }
 
     /// Add close listener. Called whenever the connection is closed
-    public func addCloseListener(named name: String, _ listener: @escaping (Result<Void, Swift.Error>) -> Void) {
-        self.closeListeners.addListener(named: name, listener: listener)
+  public func addCloseListener(named name: String, _ listener: @escaping (Result<Void, Swift.Error>) -> Void) async {
+    await self.closeListeners.addListener(named: name, listener: listener)
     }
 
     /// Remove named close listener
-    public func removeCloseListener(named name: String) {
-        self.closeListeners.removeListener(named: name)
+  public func removeCloseListener(named name: String) async {
+    await self.closeListeners.removeListener(named: name)
     }
 
     /// Add shutdown listener. Called whenever the client is shutdown
-    public func addShutdownListener(named name: String, _ listener: @escaping (Result<Void, Swift.Error>) -> Void) {
-        self.shutdownListeners.addListener(named: name, listener: listener)
+  public func addShutdownListener(named name: String, _ listener: @escaping (Result<Void, Swift.Error>) -> Void) async {
+    await self.shutdownListeners.addListener(named: name, listener: listener)
     }
 
     /// Remove named shutdown listener
-    public func removeShutdownListener(named name: String) {
-        self.shutdownListeners.removeListener(named: name)
+  public func removeShutdownListener(named name: String) async {
+    await self.shutdownListeners.removeListener(named: name)
     }
 
     internal func updatePacketId() -> UInt16 {
@@ -417,7 +419,9 @@ internal extension MQTTClient {
                         self.connection = nil
                     }
                     self.logger.debug("Network connection closed")
-                    self.closeListeners.notify(result)
+                  Task {
+                    await self.closeListeners.notify(result)
+                  }
                 }
                 self.logger.debug("Network connection established")
                 return connection.sendMessage(packet) { message -> Bool in
