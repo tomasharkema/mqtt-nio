@@ -59,7 +59,7 @@ class MQTTMessageHandler: ChannelDuplexHandler {
         let buffer = self.unwrapInboundIn(data)
 
         do {
-          try self.decoder.process(buffer: buffer) { message in Task {
+          try self.decoder.process(buffer: buffer) { message in
                 switch message.type {
                 case .PUBLISH:
                     let publishMessage = message as! MQTTPublishPacket
@@ -69,7 +69,9 @@ class MQTTMessageHandler: ChannelDuplexHandler {
                         "mqtt_packet_id": .stringConvertible(publishMessage.packetId),
                         "mqtt_topicName": .string(publishMessage.publish.topicName),
                     ])
+                    Task {
                     await self.respondToPublish(publishMessage)
+                    }
                     return
 
                 case .CONNACK, .PUBACK, .PUBREC, .PUBCOMP, .SUBACK, .UNSUBACK, .PINGRESP, .AUTH:
@@ -92,7 +94,7 @@ class MQTTMessageHandler: ChannelDuplexHandler {
                     return
                 }
                 self.client.logger.trace("MQTT In", metadata: ["mqtt_message": .stringConvertible(message), "mqtt_packet_id": .stringConvertible(message.packetId)])
-          }
+          
             }
         } catch {
             context.fireErrorCaught(error)
